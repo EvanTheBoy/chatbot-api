@@ -1,5 +1,8 @@
 package com.evan.bot.chatbotapiinterface;
 
+import com.evan.bot.chatbotapinewdomain.zsxq.IZsxqApi;
+import com.evan.bot.chatbotapinewdomain.zsxq.model.aggregates.UnansweredQuestionsAggregates;
+import com.evan.bot.chatbotapinewdomain.zsxq.model.vo.Topics;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -10,12 +13,44 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.alibaba.fastjson.JSON;
+import org.springframework.test.context.junit4.SpringRunner;
 
+import javax.annotation.Resource;
 import java.io.IOException;
+import java.util.List;
 
 @SpringBootTest
+@RunWith(SpringRunner.class)
 class ChatbotApiInterfaceApplicationTests {
+
+    @Value("$(chatbot-api.groupId)")
+    private String groupId;
+    @Value("$(chatbot-api.cookie)")
+    private String cookie;
+    @Resource
+    private IZsxqApi iZsxqApi;
+
+    private Logger logger = LoggerFactory.getLogger(ChatbotApiInterfaceApplicationTests.class);
+
+    @Test
+    public void testIZsxqApi() throws IOException {
+        UnansweredQuestionsAggregates unansweredQuestionsAggregates = iZsxqApi.queryUnansweredQuestionsTopicId(groupId, cookie);
+        logger.info("Testing results:{}", JSON.toJSONString(unansweredQuestionsAggregates));
+
+        List<Topics> topics = unansweredQuestionsAggregates.getRespData().getTopics();
+        for (Topics topic : topics) {
+            String topicId = topic.getTopicId();
+            String text = topic.getQuestion().getText();
+            logger.info("TopicId:{}, text:{}", topicId, text);
+            iZsxqApi.answer(groupId, cookie, topicId, text, false);
+        }
+    }
 
     @Test
     public void query_unanswered_questions() throws IOException {
@@ -46,12 +81,11 @@ class ChatbotApiInterfaceApplicationTests {
                 "    \"silenced\": true\n" +
                 "  }\n" +
                 "}";
-
         StringEntity stringEntity = new StringEntity(paramJson,
                 ContentType.create("text/json", "UTF-8"));
         httpPost.setEntity(stringEntity);
         CloseableHttpResponse execute = httpClient.execute(httpPost);
-        if (execute.getStatusLine().getStatusCode() == 200) {
+        if (execute.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
             String result = EntityUtils.toString(execute.getEntity());
             System.out.println(result);
         } else {
@@ -62,5 +96,6 @@ class ChatbotApiInterfaceApplicationTests {
     @Test
     void contextLoads() {
     }
+
 
 }
